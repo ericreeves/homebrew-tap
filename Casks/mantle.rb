@@ -1,9 +1,9 @@
 cask "mantle" do
   arch arm: "aarch64", intel: "x64"
 
-  version "1.1.5"
-  sha256 arm:   "bf5b78a10dd7c988d8ae38436317936e50311d5642f55c96c199ed9162563759",
-         intel: "d24f91b80622a041099f967b7f2b8de3bc3ae1d03d5e7cf2dc21c5d6e9eda939"
+  version "1.1.6"
+  sha256 arm:   "93672f8aaedbe4d5c5d4812f27177d30dad31e4217a8225189586342912e58ea",
+         intel: "503fce393a3cd2fb54fe699221c46e8d2a027ea428335eede1968819415f09f1"
 
   # NOTE: upstream tags releases as "tauri-vX.Y.Z" but the DMG filename version
   # is frozen at 1.0.0 and does not track the tag. The bump workflow rewrites

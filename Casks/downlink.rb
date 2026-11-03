@@ -16,20 +16,19 @@ cask "downlink" do
   end
 
   depends_on arch: :arm64
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "Downlink.app"
 
   # The build is ad-hoc signed (not notarized), so Gatekeeper rejects it while
   # quarantined. Strip recursively; the nested Contents/MacOS binary carries the
   # attribute too.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-dr", "com.apple.quarantine", "#{appdir}/Downlink.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "Downlink.app"], chdir: "{{appdir}}"
   end
 
-  uninstall quit:      "com.zayatura.downlink",
-            launchctl: "com.zayatura.downlink",
+  uninstall launchctl: "com.zayatura.downlink",
+            quit:      "com.zayatura.downlink",
             delete:    "~/Library/LaunchAgents/com.zayatura.downlink.plist"
 
   zap trash: [

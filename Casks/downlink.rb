@@ -3,8 +3,8 @@ cask "downlink" do
   # build-downlink workflow compiles upstream main on a macOS arm64 runner and
   # attaches the zip to a release in this repo. version = "<Cargo version>,<short commit>";
   # the workflow rewrites version/sha256 on each build.
-  version "0.1.0,0000000"
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+  version "0.1.0,7100d29"
+  sha256 "b17d3d506be9daa716000f3b0a7c61323a023208ef9073e4dcc529b8b162a25a"
 
   url "https://github.com/ericreeves/homebrew-tap/releases/download/downlink-v#{version.csv.first}-#{version.csv.second}/Downlink-#{version.csv.first}-#{version.csv.second}.zip"
   name "Downlink"

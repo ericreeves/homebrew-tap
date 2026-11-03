@@ -1,0 +1,95 @@
+name: Build downlink cask
+
+# Upstream (zayatura/downlink) publishes no releases. Build upstream main on a
+# macOS arm64 runner, publish the ad-hoc signed .app as a release in this tap,
+# and point Casks/downlink.rb at it. Skips when the cask already tracks main.
+
+on:
+  schedule:
+    - cron: "37 6 * * 1" # weekly, Monday 06:37 UTC
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild even if the cask already tracks upstream main"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: tap
+
+      - name: Compare upstream main with cask
+        id: check
+        run: |
+          set -euo pipefail
+          sha=$(git ls-remote https://github.com/zayatura/downlink refs/heads/main | cut -f1)
+          short="${sha:0:7}"
+          current=$(sed -n 's/^  version "[^,]*,\(.*\)"$/\1/p' tap/Casks/downlink.rb)
+          echo "upstream main: $short, cask: $current"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+          if [ "$short" = "$current" ] && [ "${{ inputs.force || false }}" != "true" ]; then
+            echo "Up to date."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.check.outputs.build == 'true'
+        with:
+          repository: zayatura/downlink
+          ref: ${{ steps.check.outputs.sha }}
+          path: src
+
+      - name: Build Downlink.app
+        if: steps.check.outputs.build == 'true'
+        working-directory: src
+        run: |
+          set -euo pipefail
+          rustup toolchain install # no args: installs what rust-toolchain.toml pins
+          packaging/macos/bundle.sh
+
+      - name: Publish release and bump cask
+        if: steps.check.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHORT: ${{ steps.check.outputs.short }}
+          SHA: ${{ steps.check.outputs.sha }}
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' src/Cargo.toml | head -n 1)
+          tag="downlink-v$version-$SHORT"
+          zip="Downlink-$version-$SHORT.zip"
+
+          ditto -c -k --keepParent src/target/bundle/Downlink.app "$zip"
+          zip_sha=$(shasum -a 256 "$zip" | cut -d' ' -f1)
+
+          cd tap
+          gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "$tag" "../$zip" \
+            --title "Downlink $version ($SHORT)" \
+            --notes "Built from zayatura/downlink@$SHA (ad-hoc signed, arm64)."
+
+          old=$(sed -n 's/^  version "\(.*\)"$/\1/p' Casks/downlink.rb)
+          sed -i '' \
+            -e "s|^  version \".*\"|  version \"$version,$SHORT\"|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"$zip_sha\"|" \
+            Casks/downlink.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/downlink.rb
+          if git diff --cached --quiet; then
+            echo "Cask unchanged."
+            exit 0
+          fi
+          git commit -m "downlink: bump $old -> $version,$SHORT"
+          git push
